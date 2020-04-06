@@ -71,14 +71,18 @@ function parse_command(message)
   return nil
 end
 
+function execute_command(message)
+  local command = parse_command(message)
+  if my_commands[command] ~= nil then
+    my_commands[command](player)
+  else
+    printToAll('Command not found')
+  end
+end
+
 function onChat(message, player)
   if(player.steam_name == self.getDescription()) then
-    local command = parse_command(message)
-    if my_commands[command] ~= nil then
-      my_commands[command](player)
-    else
-      printToAll('Command not found')
-    end
+    execute_command(message)
   end
 end
 
@@ -111,9 +115,9 @@ function attack(player)
   printToAll(
       'To hit: '..
       to_hit_total ..
-      ' <' .. printList(to_hit_values) .. '>' ..
+      ' (<' .. printList(to_hit_values) .. '>' ..
       ' + ' ..
-      to_hit_mod
+      to_hit_mod .. ')'
   )
 
   -- Damage
@@ -129,13 +133,18 @@ function attack(player)
   printToAll(
       'Damage: '..
       dmg_total ..
-      ' <' .. printList(dmg_values) .. '>' ..
+      ' (<' .. printList(dmg_values) .. '>' ..
       ' + ' ..
-      dmg_mod
+      dmg_mod .. ')'
   )
 
   -- Broadcast
-  broadcastToAll(character_name..' '..character_attack_line..'  '..'To hit: '..to_hit_total..'  Damage: '..dmg_total, { r=0.6, g=0, b=0 })
+  broadcastToAll(
+    character_name..' '..
+    character_attack_line..'  '..
+    'To hit: '..to_hit_total..
+    '  Damage: '..dmg_total, { r=0.6, g=0, b=0 }
+  )
 end
 
 function fort_save(player)
@@ -151,8 +160,14 @@ function reflex_save(player)
 end
 
 function save(player, type)
-  mod = get_data_value(type..'_save')
-  return xdx(1, 20) + mod
+  local mod = get_data_value(type..'_save')
+  local roll, roll_values = xdx(1, 20)
+
+  broadcastToAll(
+    character_name..' makes a '..type..' save: '..(roll + mod)..
+    ' (<' .. printList(roll_values) .. '> + '..mod..')',
+    { r=0.6, g=0, b=0 }
+  )
 end
 
 -- Helper functions
@@ -287,5 +302,24 @@ if not isTTS() then
     test()
   else
     -- CLI
+
+    -- Need to stub some TTS library functions
+    function printToAll(message, color)
+      print(message)
+    end
+
+    function broadcastToAll(message, color)
+      print(message)
+    end
+
+    Player = {
+      color = 'commandline'
+    }
+
+    -- Use the same entry point for command globals
+    onLoad()
+
+    command = '#'..arg[1]
+    execute_command(command)
   end
 end
