@@ -17,6 +17,8 @@ character_attack_line = 'strikes with flaming fury!'
 
 data_obj = nil
 
+self_obj = nil
+
 function onLoad(save_state)
   -- Add commands to the table here
   my_commands = {
@@ -27,7 +29,8 @@ function onLoad(save_state)
     reflex = reflex_save,
     will = will_save,
 
-    test = test
+    test = test,
+    template = template
   }
 
   -- keybinds
@@ -38,6 +41,8 @@ function onLoad(save_state)
     perception, -- 4
     attack -- 5
   }
+
+  self_obj = self
 end
 
 function onExternalCommand(input)
@@ -65,16 +70,21 @@ end
 
 function parse_command(message)
   if string.find(message, '#', 1) == 1 then
-    return string.sub(message, 2)
+    local all_args = {}
+    for word in string.gmatch(string.sub(message, 2), '%S+') do
+      table.insert(all_args, word)
+    end
+    local command = table.remove(all_args, 1)
+    return command, all_args
   end
 
-  return nil
+  return nil, nil
 end
 
 function execute_command(message)
-  local command = parse_command(message)
+  local command, args = parse_command(message)
   if my_commands[command] ~= nil then
-    my_commands[command](player)
+    my_commands[command](player, args)
   else
     printToAll('Command not found')
   end
@@ -84,6 +94,11 @@ function onChat(message, player)
   if(player.steam_name == self.getDescription()) then
     execute_command(message)
   end
+end
+
+function template(player, args)
+  local type = args[1]
+  SpellTemplates.SpawnTemplate(self_obj, type)
 end
 
 function perception(player)
@@ -182,7 +197,7 @@ function parse_data_obj_description()
   local lines = data_obj.getDescription():gmatch("[^\r\n]+")
   for line in lines do
     local split_line = line:gmatch(":%S+")
-    for k, v in line:gmatch("([^%s]+):%s+([^%s]+)") do
+    for k, v in line:gmatch("(%S+):%s+(%S+)") do
       key = snake(k)
       value = tonumber(v) or v
     end
@@ -321,5 +336,159 @@ if not isTTS() then
 
     command = '#'..arg[1]
     execute_command(command)
+  end
+end
+
+-- Code based on  the most excellent XWing Unified 2.0 mod
+
+SpellTemplates = {}
+
+-- Table of existing spawned templates
+-- Entry: {obj=objectRef, template=templateRef, type=templateCode}
+SpellTemplates.spawnedTemplates = {}
+
+-- Click function for template button (destroy)
+function SpellTemplate_SelfDestruct(obj)
+  for k, rTable in pairs(SpellTemplates.spawnedTemplates) do
+    if rTable.template == obj then
+      table.remove(SpellTemplates.spawnedTemplates, k)
+      break
+    end
+  end
+  obj.destruct()
+end
+
+-- Remove appropriate entry if template is destroyed
+SpellTemplates.onObjectDestroyed = function(obj)
+  for k,info in pairs(SpellTemplates.spawnedTemplates) do
+    if info.obj == obj or info.template == obj then
+      if info.obj == obj then info.template.destruct() end
+      table.remove(SpellTemplates.spawnedTemplates, k)
+      break
+    end
+  end
+end
+
+-- TEMPLATE MESHES DATABASE
+SpellTemplates.meshes = {}
+SpellTemplates.scales = {}
+SpellTemplates.scale = {0.09, 0.09, 0.09}
+SpellTemplates.meshes.radius_5ft = 'file:///Users/jcavanagh/tts_templates/Spell_Markers_5_ft_radius.stl.obj'
+SpellTemplates.scales.radius_5ft = {0.09, 0.09, 0.09}
+SpellTemplates.meshes.radius_10ft = 'file:///Users/jcavanagh/tts_templates/Spell_Markers_10_ft_radius.stl.obj'
+SpellTemplates.scales.radius_10ft = {0.08, 0.08, 0.08}
+SpellTemplates.meshes.radius_15ft = 'file:///Users/jcavanagh/tts_templates/Spell_Markers_15_ft_radius.stl.obj'
+SpellTemplates.scales.radius_15ft = {0.075, 0.075, 0.075}
+SpellTemplates.meshes.radius_20ft = 'file:///Users/jcavanagh/tts_templates/Spell_Markers_20_ft_radius.stl.obj'
+SpellTemplates.scales.radius_20ft = {0.07, 0.07, 0.07}
+
+-- Avaialble template codes:
+-- R5            - 5ft radius
+-- R10           - 10ft radius
+-- R15           - 15ft radius
+-- R20           - 20ft radius
+-- Translate template code to a mesh entry
+SpellTemplates.typeToKey = {}
+SpellTemplates.typeToKey['R'] = 'radius'
+
+-- Get template spawn tables for some object and some template code
+-- Return table with "mesh", "collider" and "scale" keys
+--  (for appropriate template)
+SpellTemplates.GetTemplateData = function(obj, templateType)
+  local out = {mesh = nil, collider = nil, scale = nil}
+  printToAll(templateType)
+  if templateType:sub(1,1) == 'R' then
+    rKey = tonumber(templateType:sub(2))
+    printToAll(rKey)
+    out.mesh = SpellTemplates.meshes['radius_'..rKey..'ft']
+    out.scale = SpellTemplates.scales['radius_'..rKey..'ft']
+  end
+  -- out.scale = SpellTemplates.scale
+  out.collider = nil
+  return out
+end
+
+-- Return a descriptive arc name of command (for announcements)
+SpellTemplates.DescriptiveName = function(obj, templateType)
+  if templateType:sub(1,1) == 'R' then
+    ranges = templateType:sub(2,2)
+    return ranges .. 'ft radius'
+  end
+end
+
+-- Create tables for spawning a template
+-- Return:  {
+--      params      <- table suitable for spawnObject(params) call
+--      custom      <- table suitable for obj.setCustomObject(custom) call
+--          }
+SpellTemplates.CreateCustomTables = function(obj, templateType)
+  local templateData = SpellTemplates.GetTemplateData(obj, templateType)
+  local paramsTable = {}
+  paramsTable.type = 'Custom_Model'
+  paramsTable.position = obj.getPosition()
+  paramsTable.rotation = {90, obj.getRotation()[2], 0}
+  -- if templateType == 'B' then
+  --   if ModelDB.GetData(obj).baseSize == 'small' then
+  --     rot = obj.getRotation()[2]
+  --     paramsTable.rotation={0, rot +180, 0}
+  --   end
+  -- end
+  -- if templateType == 'SR' then
+  --   rot = obj.getRotation()[2]
+  --   paramsTable.rotation= {0, rot + 180, 0}
+  --   if ModelDB.GetData(obj).baseSize == 'medium' then                        --Side arc model for medium bases is inverted in relation to small and large bases, so it must be rotated 180 degrees as a workaround
+  --     paramsTable.rotation= {0, rot, 0}
+  --   end
+  -- end
+  -- if templateType == 'SL' and ModelDB.GetData(obj).baseSize == 'medium' then      --Side arc model for medium bases is inverted in relation to small and large bases, so it must be rotated 180 degrees as a workaround
+  --   rot = obj.getRotation()[2]
+  --   paramsTable.rotation= {0, rot + 180 , 0}
+  -- end
+  
+  paramsTable.scale = templateData.scale
+
+  local customTable = {}
+  customTable.mesh = templateData.mesh
+  customTable.collider = templateData.collider
+
+  return {params = paramsTable, custom = customTable}
+end
+
+-- Spawn a template for an object
+-- Returns new template reference
+SpellTemplates.SpawnTemplate = function(obj, templateType)
+  local templateData = SpellTemplates.CreateCustomTables(obj, templateType)
+  local newTemplate = spawnObject(templateData.params)
+  newTemplate.setCustomObject(templateData.custom)
+  table.insert(SpellTemplates.spawnedTemplates, {obj = obj, template = newTemplate, type = templateType})
+  newTemplate.lock()
+  newTemplate.setScale(templateData.params.scale)
+
+  local button = {click_function = 'SpellTemplate_SelfDestruct', label = 'DEL', position = {0, 0.5, 0}, rotation =  {0, 0, 0}, width = 900, height = 900, font_size = 250}
+  newTemplate.createButton(button)
+  return newTemplate
+end
+
+-- Delete existing template for an object
+-- Return deleted template type or nil if there was none
+SpellTemplates.DeleteTemplate = function(obj)
+  for k,rTable in pairs(SpellTemplates.spawnedTemplates) do
+    if rTable.obj == obj then
+      rTable.ruler.destruct()
+      local destType = rTable.type
+      table.remove(SpellTemplates.spawnedTemplates, k)
+      return destType
+    end
+  end
+  return nil
+end
+
+-- Toggle template for an object
+-- If a template of queried type exists, just delete it and return nil
+-- If any other template exists, delete it (and spawn queried one), return new template ref
+SpellTemplates.ToggleRuler = function(obj, templateType)
+  local destType = SpellTemplates.DeleteTemplate(obj)
+  if destType ~= templateType then
+    return SpellTemplates.SpawnTemplate(obj, templateType)
   end
 end
