@@ -61,10 +61,8 @@ local Card=setmetatable({n=1,hwfd=true,image=false,json='',position={0,0,0},snap
         Deck[qTbl.color].cd=Deck[qTbl.color].cd..t.json:sub(fistpos,-3)..','
         if n==qTbl.deck then Wait.time(function()Deck(qTbl)end,1)
           Player[qTbl.color].broadcast('All '..n..' Cards loaded!',{0.5,0.5,0.5})
-        elseif 5==qTbl.deck-n then
-          printToAll('Spawning here\nAlmost loaded')
-        elseif 5<qTbl.deck-n then
-          printToAll('Spawning here\n'..n..' Cards loaded')
+        else
+          printToAll(n..' Cards loaded')
         end
       else--Spawn solo card
         uLog(qTbl.color..' Spawned '..c.name:gsub('\n.*',''))
@@ -342,7 +340,7 @@ local Importer=setmetatable({
     },{
   __call=function(t,qTbl)
     if qTbl then
-      printToAll(qTbl,'Importer Request '..qTbl.color)
+      printToAll('Importer Request '..qTbl.color)
       table.insert(t.request,qTbl)
     end
     --Main Logic
