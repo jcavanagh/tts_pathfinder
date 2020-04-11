@@ -1,9 +1,9 @@
 --By Amuzet
 mod_name='Card Importer'
 version=1.77
-self.setName(mod_name..' '..version)
-author='76561198045776458'
-WorkshopID='https://steamcommunity.com/sharedfiles/filedetails/?id=1838051922'
+self.setName(mod_name..' '..version..' (Deckbox fix)')
+-- author='76561198045776458'
+-- WorkshopID='https://steamcommunity.com/sharedfiles/filedetails/?id=1838051922'
 
 --[[Classes]]
 local TBL={__call=function(t,k)if k then return t[k] end return t.___ end,__index=function(t,k)if type(t.___)=='table'then rawset(t,k,t.___())else rawset(t,k,t.___)end return t[k] end}
@@ -62,9 +62,9 @@ local Card=setmetatable({n=1,hwfd=true,image=false,json='',position={0,0,0},snap
         if n==qTbl.deck then Wait.time(function()Deck(qTbl)end,1)
           Player[qTbl.color].broadcast('All '..n..' Cards loaded!',{0.5,0.5,0.5})
         elseif 5==qTbl.deck-n then
-          qTbl.text('Spawning here\nAlmost loaded')
+          printToAll('Spawning here\nAlmost loaded')
         elseif 5<qTbl.deck-n then
-          qTbl.text('Spawning here\n'..n..' Cards loaded')
+          printToAll('Spawning here\n'..n..' Cards loaded')
         end
       else--Spawn solo card
         uLog(qTbl.color..' Spawned '..c.name:gsub('\n.*',''))
@@ -342,8 +342,7 @@ local Importer=setmetatable({
     },{
   __call=function(t,qTbl)
     if qTbl then
-      log(qTbl,'Importer Request '..qTbl.color)
-      qTbl.text=newText(qTbl.position,Player[qTbl.color].steam_name..'\n'..qTbl.full)
+      printToAll(qTbl,'Importer Request '..qTbl.color)
       table.insert(t.request,qTbl)
     end
     --Main Logic
@@ -416,8 +415,8 @@ end
 function onSave()self.script_state=JSON.encode(Back)end
 function onLoad(data)
   Usage=Usage:format(self.getName())
-  WebRequest.get(WorkshopID,self,'uVersion')
-  if data~=''then Back=JSON.decode(data)else Back=JSON.decode('{"___":"https://i.stack.imgur.com/787gj.png","76561198000043097":"https://i.imgur.com/rfQsgTL.png","76561198025014348":"https://i.imgur.com/pPnIKhy.png","76561198045241564":"http://i.imgur.com/P7qYTcI.png","76561198045776458":"https://media.wizards.com/2019/images/daily/oCa6ZZvWzu.png","76561198069287630":"http://i.imgur.com/OCOGzLH.jpg","76561198079063165":"https://external-preview.redd.it/QPaqxNBqLVUmR6OZTPpsdGd4MNuCMv91wky1SZdxqUc.png?s=006bfa2facd944596ff35301819a9517e6451084"}')end
+  -- WebRequest.get(WorkshopID,self,'uVersion')
+  -- if data~=''then Back=JSON.decode(data)else Back=JSON.decode('{"___":"https://i.stack.imgur.com/787gj.png","76561198000043097":"https://i.imgur.com/rfQsgTL.png","76561198025014348":"https://i.imgur.com/pPnIKhy.png","76561198045241564":"http://i.imgur.com/P7qYTcI.png","76561198045776458":"https://media.wizards.com/2019/images/daily/oCa6ZZvWzu.png","76561198069287630":"http://i.imgur.com/OCOGzLH.jpg","76561198079063165":"https://external-preview.redd.it/QPaqxNBqLVUmR6OZTPpsdGd4MNuCMv91wky1SZdxqUc.png?s=006bfa2facd944596ff35301819a9517e6451084"}')end
   Back=TBL.new(Back)
   self.createButton({label="+",click_function='registerModule',function_owner=self,position={0,0.2,-0.5},height=100,width=100,font_size=100,tooltip="Adds Oracle Look Up"})
   uNotebook('SHelp',Usage)
